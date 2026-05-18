@@ -335,6 +335,19 @@ export {
 } from "./cost.js";
 
 export {
+  createModelDefinitionSchema,
+  updateModelDefinitionSchema,
+  createPricingTierSchema,
+  updatePricingTierSchema,
+  createModelPriceSchema,
+  type CreateModelDefinitionInput,
+  type UpdateModelDefinitionInput,
+  type CreatePricingTierInput,
+  type UpdatePricingTierInput,
+  type CreateModelPriceInput,
+} from "./model.js";
+
+export {
   createFinanceEventSchema,
   type CreateFinanceEvent,
 } from "./finance.js";
