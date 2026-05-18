@@ -5,6 +5,7 @@ import { issues } from "./issues.js";
 import { projects } from "./projects.js";
 import { goals } from "./goals.js";
 import { heartbeatRuns } from "./heartbeat_runs.js";
+import { modelDefinitions } from "./model_definitions.js";
 
 export const costEvents = pgTable(
   "cost_events",
@@ -17,6 +18,7 @@ export const costEvents = pgTable(
     goalId: uuid("goal_id").references(() => goals.id),
     heartbeatRunId: uuid("heartbeat_run_id").references(() => heartbeatRuns.id),
     billingCode: text("billing_code"),
+    modelDefinitionId: uuid("model_definition_id").references(() => modelDefinitions.id),
     provider: text("provider").notNull(),
     biller: text("biller").notNull().default("unknown"),
     billingType: text("billing_type").notNull().default("unknown"),

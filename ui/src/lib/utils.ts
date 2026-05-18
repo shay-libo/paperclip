@@ -131,20 +131,6 @@ export function quotaSourceDisplayName(source: string): string {
   return map[source] ?? source;
 }
 
-function coerceBillingType(value: unknown): BillingType | null {
-  if (
-    value === "metered_api" ||
-    value === "subscription_included" ||
-    value === "subscription_overage" ||
-    value === "credits" ||
-    value === "fixed" ||
-    value === "unknown"
-  ) {
-    return value;
-  }
-  return null;
-}
-
 function readRunCostUsd(payload: Record<string, unknown> | null): number {
   if (!payload) return 0;
   for (const key of ["costUsd", "cost_usd", "total_cost_usd"] as const) {
@@ -158,8 +144,6 @@ export function visibleRunCostUsd(
   usage: Record<string, unknown> | null,
   result: Record<string, unknown> | null = null,
 ): number {
-  const billingType = coerceBillingType(usage?.billingType) ?? coerceBillingType(result?.billingType);
-  if (billingType === "subscription_included") return 0;
   return readRunCostUsd(usage) || readRunCostUsd(result);
 }
 
