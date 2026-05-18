@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const modelDefinitionMetadataSchema = z.record(z.unknown()).nullable();
+const modelDefinitionMetadataSchema = z.record(z.unknown()).nullable();
 
 export const createModelDefinitionSchema = z.object({
   companyId: z.string().uuid().nullable().optional(),
@@ -19,7 +19,7 @@ export const updateModelDefinitionSchema = z.object({
   metadata: modelDefinitionMetadataSchema.optional(),
 });
 
-export const pricingTierConditionsSchema = z.record(z.unknown()).nullable();
+const pricingTierConditionsSchema = z.record(z.unknown()).nullable();
 
 export const createPricingTierSchema = z.object({
   modelId: z.string().uuid(),
@@ -43,30 +43,8 @@ export const createModelPriceSchema = z.object({
   currency: z.string().length(3).default("USD"),
 });
 
-export const updateModelPriceSchema = z.object({
-  usageType: z.enum(["input", "output", "cached_input"]).optional(),
-  pricePerUnit: z.string().regex(/^\d+(\.\d+)?$/).optional(),
-  currency: z.string().length(3).optional(),
-});
-
-export const modelMatchRequestSchema = z.object({
-  projectId: z.string().uuid(),
-  model: z.string().min(1),
-});
-
-export const calculateCostRequestSchema = z.object({
-  modelDefinitionId: z.string().uuid(),
-  inputTokens: z.number().int().min(0).default(0),
-  cachedInputTokens: z.number().int().min(0).default(0),
-  outputTokens: z.number().int().min(0).default(0),
-  conditions: z.record(z.unknown()).optional(),
-});
-
 export type CreateModelDefinitionInput = z.infer<typeof createModelDefinitionSchema>;
 export type UpdateModelDefinitionInput = z.infer<typeof updateModelDefinitionSchema>;
 export type CreatePricingTierInput = z.infer<typeof createPricingTierSchema>;
 export type UpdatePricingTierInput = z.infer<typeof updatePricingTierSchema>;
 export type CreateModelPriceInput = z.infer<typeof createModelPriceSchema>;
-export type UpdateModelPriceInput = z.infer<typeof updateModelPriceSchema>;
-export type ModelMatchRequest = z.infer<typeof modelMatchRequestSchema>;
-export type CalculateCostRequest = z.infer<typeof calculateCostRequestSchema>;

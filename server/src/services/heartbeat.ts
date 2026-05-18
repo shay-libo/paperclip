@@ -57,6 +57,8 @@ import type {
 import { createLocalAgentJwt } from "../agent-auth-jwt.js";
 import { parseObject, asBoolean, asNumber, appendWithByteCap, MAX_EXCERPT_BYTES } from "../adapters/utils.js";
 import { costService } from "./costs.js";
+import { modelPricingService } from "./modelPricing.js";
+import type { CalculatedCost } from "@paperclipai/shared";
 import { trackAgentFirstHeartbeat } from "@paperclipai/shared/telemetry";
 import { getTelemetryClient } from "../telemetry.js";
 import { companySkillService } from "./company-skills.js";
@@ -1294,12 +1296,6 @@ function normalizeLedgerBillingType(value: unknown): BillingType {
 
 function resolveLedgerBiller(result: AdapterExecutionResult): string {
   return readNonEmptyString(result.biller) ?? readNonEmptyString(result.provider) ?? "unknown";
-}
-
-function normalizeBilledCostCents(costUsd: number | null | undefined, billingType: BillingType): number {
-  if (billingType === "subscription_included") return 0;
-  if (typeof costUsd !== "number" || !Number.isFinite(costUsd)) return 0;
-  return Math.max(0, Math.round(costUsd * 100));
 }
 
 async function resolveLedgerScopeForRun(
@@ -6633,6 +6629,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     result: AdapterExecutionResult,
     session: { legacySessionId: string | null },
     normalizedUsage?: UsageTotals | null,
+    calculatedCost?: CalculatedCost | null,
   ) {
     await ensureRuntimeState(agent);
     const usage = normalizedUsage ?? normalizeUsageTotals(result.usage);
@@ -6640,7 +6637,13 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     const outputTokens = usage?.outputTokens ?? 0;
     const cachedInputTokens = usage?.cachedInputTokens ?? 0;
     const billingType = normalizeLedgerBillingType(result.billingType);
-    const additionalCostCents = normalizeBilledCostCents(result.costUsd, billingType);
+    const cost = calculatedCost ?? await modelPricingService(db).calculateForRun({
+      provider: result.provider,
+      model: result.model,
+      usage: { inputTokens, outputTokens, cachedInputTokens },
+      companyId: agent.companyId,
+    });
+    const additionalCostCents = cost.costCents;
     const hasTokenUsage = inputTokens > 0 || outputTokens > 0 || cachedInputTokens > 0;
     const provider = result.provider ?? "unknown";
     const biller = resolveLedgerBiller(result);
@@ -6673,6 +6676,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
         biller,
         billingType,
         model: result.model ?? "unknown",
+        modelDefinitionId: cost.modelDefinitionId,
         inputTokens,
         cachedInputTokens,
         outputTokens,
@@ -7745,6 +7749,17 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       });
       const normalizedUsage = sessionUsageResolution.normalizedUsage;
 
+      const calculatedCost = await modelPricingService(db).calculateForRun({
+        provider: adapterResult.provider,
+        model: adapterResult.model,
+        usage: {
+          inputTokens: normalizedUsage?.inputTokens ?? 0,
+          outputTokens: normalizedUsage?.outputTokens ?? 0,
+          cachedInputTokens: normalizedUsage?.cachedInputTokens ?? 0,
+        },
+        companyId: agent.companyId,
+      });
+
       let outcome: "succeeded" | "failed" | "cancelled" | "timed_out";
       const latestRun = await getRun(run.id);
       if (isHeartbeatRunTerminalStatus(latestRun?.status)) {
@@ -7794,7 +7809,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
               : "failed";
 
       const usageJson =
-        normalizedUsage || adapterResult.costUsd != null
+        normalizedUsage || calculatedCost.isCalculated
           ? ({
               ...(normalizedUsage ?? {}),
               ...(rawUsage ? {
@@ -7814,7 +7829,9 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
               provider: readNonEmptyString(adapterResult.provider) ?? "unknown",
               biller: resolveLedgerBiller(adapterResult),
               model: readNonEmptyString(adapterResult.model) ?? "unknown",
-              ...(adapterResult.costUsd != null ? { costUsd: adapterResult.costUsd } : {}),
+              costUsd: calculatedCost.costCents / 100,
+              modelDefinitionId: calculatedCost.modelDefinitionId,
+              costCalculated: calculatedCost.isCalculated,
               billingType: normalizeLedgerBillingType(adapterResult.billingType),
             } as Record<string, unknown>)
           : null;
@@ -7930,7 +7947,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       if (finalizedRun) {
         await updateRuntimeState(agent, finalizedRun, adapterResult, {
           legacySessionId: nextSessionState.legacySessionId,
-        }, normalizedUsage);
+        }, normalizedUsage, calculatedCost);
         if (taskKey) {
           if (adapterResult.clearSession || (!nextSessionState.params && !nextSessionState.displayId)) {
             await clearTaskSessions(agent.companyId, agent.id, {

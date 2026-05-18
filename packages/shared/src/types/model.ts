@@ -38,13 +38,6 @@ export interface ModelWithPricing {
   }>;
 }
 
-export interface ModelMatchResult {
-  modelDefinition: ModelDefinition | null;
-  pricingTier: (ModelPricingTier & {
-    prices: ModelPrice[];
-  }) | null;
-}
-
 export interface CalculatedCost {
   costCents: number;
   inputTokens: number;
@@ -52,4 +45,13 @@ export interface CalculatedCost {
   outputTokens: number;
   modelDefinitionId: string | null;
   isCalculated: boolean; // true if calculated from pricing, false if from adapter
+}
+
+export interface ModelCatalogEntry {
+  id: string;
+  modelName: string;
+  provider: string;
+  inputCostPerToken: string | null;
+  outputCostPerToken: string | null;
+  cachedInputCostPerToken: string | null;
 }
