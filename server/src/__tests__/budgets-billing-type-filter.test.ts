@@ -10,7 +10,7 @@ import {
 import { budgetService } from "../services/budgets.ts";
 import { startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.ts";
 
-describe("budgetService billing type filter", () => {
+describe("budgetService observed amount", () => {
   let db!: ReturnType<typeof createDb>;
   let tempDb: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>> | null = null;
   let companyId!: string;
@@ -79,7 +79,11 @@ describe("budgetService billing type filter", () => {
     });
   }
 
-  it("excludes subscription_included rows from billed_cents observed amount", async () => {
+  // Locks in the behavior that observedAmount sums every billing type so the
+  // value displayed in the Budget tab matches agent.spentMonthlyCents (which
+  // is the pre-policy fallback) — otherwise creating a policy appears to zero
+  // the OBSERVED for subscription-only agents.
+  it("counts subscription_included rows toward billed_cents observed amount", async () => {
     await seedCompanyAndAgent();
     await seedHardStopPolicy(100);
     await insertCostEvent("subscription_included", 500);
@@ -88,10 +92,11 @@ describe("budgetService billing type filter", () => {
     const service = budgetService(db);
     const block = await service.getInvocationBlock(companyId, agentId);
 
-    expect(block).toBeNull();
+    expect(block).not.toBeNull();
+    expect(block?.scopeType).toBe("agent");
   });
 
-  it("counts non-subscription rows normally toward billed_cents observed amount", async () => {
+  it("counts metered_api rows normally toward billed_cents observed amount", async () => {
     await seedCompanyAndAgent();
     await seedHardStopPolicy(100);
     await insertCostEvent("metered_api", 120);
