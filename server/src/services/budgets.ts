@@ -148,6 +148,7 @@ async function computeObservedAmount(
   const conditions = [eq(costEvents.companyId, policy.companyId)];
   if (policy.scopeType === "agent") conditions.push(eq(costEvents.agentId, policy.scopeId));
   if (policy.scopeType === "project") conditions.push(eq(costEvents.projectId, policy.scopeId));
+  conditions.push(ne(costEvents.billingType, "subscription_included"));
   const { start, end } = resolveWindow(policy.windowKind as BudgetWindowKind);
   if (policy.windowKind === "calendar_month_utc") {
     conditions.push(gte(costEvents.occurredAt, start));
